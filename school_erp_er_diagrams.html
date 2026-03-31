@@ -1,0 +1,693 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{padding:1rem 0;font-size:13px}
+.top{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+.dbt{padding:5px 14px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:transparent;cursor:pointer;font-size:12px;color:var(--color-text-secondary);transition:all .15s;white-space:nowrap}
+.dbt:hover{background:var(--color-background-secondary)}
+.dbt.on{color:#fff;border-color:transparent}
+#erd-wrap{width:100%}
+#erd-wrap svg{width:100%;height:auto;display:block}
+</style>
+<div class="wrap">
+<div class="top" id="tabs"></div>
+<div id="erd-wrap"></div>
+</div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark=matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad:false,
+  theme:'base',
+  fontFamily:'"Anthropic Sans",sans-serif',
+  themeVariables:{
+    darkMode:dark,
+    fontSize:'13px',
+    fontFamily:'"Anthropic Sans",sans-serif',
+    lineColor:dark?'#9c9a92':'#73726c',
+    textColor:dark?'#c2c0b6':'#3d3d3a',
+    primaryColor:dark?'#2a2864':'#EEEDFE',
+    primaryTextColor:dark?'#CECBF6':'#26215C',
+    primaryBorderColor:dark?'#534AB7':'#534AB7',
+    edgeLabelBackground:dark?'#1a1a1a':'#ffffff',
+    attributeBackgroundColorEven:dark?'#1e1e1e':'#f8f8f8',
+    attributeBackgroundColorOdd:dark?'#252525':'#ffffff',
+  }
+});
+
+const DOMAINS=[
+  {id:'core',label:'Core / Auth & RBAC',color:'#534AB7',
+   diagram:`erDiagram
+    schools {
+      uuid id PK
+      string name
+      string code
+      string board_type
+      boolean is_active
+      timestamp created_at
+    }
+    users {
+      uuid id PK
+      uuid school_id FK
+      string email
+      string phone
+      string password_hash
+      string first_name
+      string last_name
+      boolean is_active
+      timestamp last_login_at
+    }
+    roles {
+      uuid id PK
+      uuid school_id FK
+      string name
+      string slug
+      string department
+      string access_level
+      boolean is_system
+    }
+    modules {
+      uuid id PK
+      string name
+      string slug
+      int display_order
+      boolean is_active
+    }
+    user_roles {
+      uuid id PK
+      uuid user_id FK
+      uuid role_id FK
+      uuid school_id FK
+      uuid assigned_by FK
+      date valid_from
+      date valid_until
+      boolean is_active
+    }
+    role_permissions {
+      uuid id PK
+      uuid role_id FK
+      uuid module_id FK
+      boolean can_view
+      boolean can_create
+      boolean can_edit
+      boolean can_delete
+      boolean can_approve
+      boolean can_export
+      string scope
+    }
+    sessions {
+      uuid id PK
+      uuid user_id FK
+      string token_hash
+      string ip_address
+      timestamp expires_at
+      timestamp revoked_at
+    }
+    login_attempts {
+      uuid id PK
+      string email
+      string ip_address
+      boolean success
+      string failure_reason
+      timestamp attempted_at
+    }
+    schools ||--o{ users : "has"
+    schools ||--o{ roles : "defines"
+    users ||--o{ user_roles : "assigned"
+    roles ||--o{ user_roles : "given to"
+    roles ||--o{ role_permissions : "grants"
+    modules ||--o{ role_permissions : "controlled by"
+    users ||--o{ sessions : "creates"
+    schools ||--o{ modules : "enables"
+   `},
+
+  {id:'people',label:'People',color:'#1D9E75',
+   diagram:`erDiagram
+    users {
+      uuid id PK
+      string email
+      string first_name
+      string last_name
+      boolean is_active
+    }
+    schools {
+      uuid id PK
+      string name
+      string code
+    }
+    staff {
+      uuid id PK
+      uuid user_id FK
+      uuid school_id FK
+      string employee_id
+      string designation
+      string department
+      date date_of_joining
+      string employment_type
+      string qualification
+      string bank_account_no
+      boolean is_active
+    }
+    students {
+      uuid id PK
+      uuid user_id FK
+      uuid school_id FK
+      string admission_no
+      string roll_no
+      uuid current_class_id FK
+      uuid current_section_id FK
+      string academic_year
+      date date_of_admission
+      string blood_group
+      boolean tc_issued
+      boolean is_active
+    }
+    guardians {
+      uuid id PK
+      uuid user_id FK
+      uuid student_id FK
+      string relation
+      boolean is_primary
+      string occupation
+      string office_phone
+    }
+    admissions {
+      uuid id PK
+      uuid school_id FK
+      string applicant_name
+      uuid class_applied_id FK
+      string academic_year
+      string stage
+      date interview_date
+      uuid handled_by FK
+      uuid student_id FK
+      string source
+    }
+    users ||--o| staff : "is a"
+    users ||--o| students : "is a"
+    users ||--o| guardians : "is a"
+    schools ||--o{ staff : "employs"
+    schools ||--o{ students : "enrolls"
+    students ||--o{ guardians : "has"
+    schools ||--o{ admissions : "tracks"
+    admissions ||--o| students : "becomes"
+   `},
+
+  {id:'academic',label:'Academic',color:'#185FA5',
+   diagram:`erDiagram
+    classes {
+      uuid id PK
+      uuid school_id FK
+      string name
+      int numeric_order
+      boolean is_active
+    }
+    sections {
+      uuid id PK
+      uuid class_id FK
+      uuid school_id FK
+      string name
+      uuid class_teacher_id FK
+      string room_number
+      int max_strength
+      string academic_year
+    }
+    subjects {
+      uuid id PK
+      uuid school_id FK
+      string name
+      string code
+      string type
+      int max_marks
+      int pass_marks
+    }
+    timetable_slots {
+      uuid id PK
+      uuid section_id FK
+      uuid subject_id FK
+      uuid teacher_id FK
+      int day_of_week
+      int period_number
+      time start_time
+      time end_time
+      string academic_year
+    }
+    attendance {
+      uuid id PK
+      uuid school_id FK
+      string entity_type
+      uuid entity_id FK
+      uuid section_id FK
+      date date
+      int period_number
+      string status
+      uuid marked_by FK
+    }
+    exams {
+      uuid id PK
+      uuid school_id FK
+      string name
+      string exam_type
+      string academic_year
+      date start_date
+      date end_date
+      boolean is_published
+    }
+    exam_schedules {
+      uuid id PK
+      uuid exam_id FK
+      uuid class_id FK
+      uuid subject_id FK
+      date exam_date
+      time start_time
+      int max_marks
+      string room_no
+    }
+    marks {
+      uuid id PK
+      uuid student_id FK
+      uuid exam_schedule_id FK
+      numeric marks_obtained
+      string grade
+      uuid entered_by FK
+      boolean is_absent
+    }
+    homework {
+      uuid id PK
+      uuid section_id FK
+      uuid subject_id FK
+      uuid teacher_id FK
+      string title
+      date due_date
+      string attachment_url
+    }
+    leaves {
+      uuid id PK
+      uuid school_id FK
+      string entity_type
+      uuid entity_id FK
+      string leave_type
+      date from_date
+      date to_date
+      string status
+      uuid approved_by FK
+    }
+    classes ||--o{ sections : "has"
+    sections ||--o{ timetable_slots : "scheduled in"
+    subjects ||--o{ timetable_slots : "taught via"
+    exams ||--o{ exam_schedules : "has"
+    classes ||--o{ exam_schedules : "for"
+    subjects ||--o{ exam_schedules : "tested in"
+    exam_schedules ||--o{ marks : "produces"
+    sections ||--o{ homework : "receives"
+    subjects ||--o{ homework : "assigned for"
+    sections ||--o{ attendance : "tracked in"
+   `},
+
+  {id:'finance',label:'Finance',color:'#854F0B',
+   diagram:`erDiagram
+    schools {
+      uuid id PK
+      string name
+    }
+    students {
+      uuid id PK
+      string admission_no
+      string academic_year
+    }
+    staff {
+      uuid id PK
+      string employee_id
+      string designation
+    }
+    fee_structures {
+      uuid id PK
+      uuid school_id FK
+      uuid class_id FK
+      string name
+      numeric amount
+      string frequency
+      int due_day
+      string academic_year
+      numeric late_fee
+      boolean is_active
+    }
+    fee_invoices {
+      uuid id PK
+      uuid student_id FK
+      uuid fee_structure_id FK
+      uuid school_id FK
+      string invoice_number
+      numeric amount
+      numeric discount
+      numeric late_fee
+      date due_date
+      string status
+      string academic_year
+    }
+    fee_payments {
+      uuid id PK
+      uuid invoice_id FK
+      uuid collected_by FK
+      numeric amount_paid
+      string payment_method
+      string transaction_ref
+      string receipt_number
+      timestamp payment_date
+      boolean is_reversed
+    }
+    fee_concessions {
+      uuid id PK
+      uuid student_id FK
+      uuid fee_structure_id FK
+      string concession_type
+      string discount_type
+      numeric discount_value
+      uuid approved_by FK
+      date valid_from
+      date valid_until
+    }
+    payroll {
+      uuid id PK
+      uuid staff_id FK
+      uuid school_id FK
+      int month
+      int year
+      numeric basic_salary
+      numeric allowances
+      numeric pf_deduction
+      numeric net_salary
+      string status
+      uuid approved_by FK
+      date paid_on
+    }
+    expenses {
+      uuid id PK
+      uuid school_id FK
+      string category
+      numeric amount
+      date expense_date
+      string vendor_name
+      uuid recorded_by FK
+      uuid approved_by FK
+    }
+    schools ||--o{ fee_structures : "defines"
+    fee_structures ||--o{ fee_invoices : "generates"
+    students ||--o{ fee_invoices : "billed"
+    fee_invoices ||--o{ fee_payments : "settled by"
+    students ||--o{ fee_concessions : "receives"
+    fee_structures ||--o{ fee_concessions : "discounted in"
+    staff ||--o{ payroll : "paid via"
+    schools ||--o{ expenses : "records"
+   `},
+
+  {id:'ops',label:'Operations',color:'#993C1D',
+   diagram:`erDiagram
+    schools {
+      uuid id PK
+      string name
+    }
+    students {
+      uuid id PK
+      string admission_no
+    }
+    transport_routes {
+      uuid id PK
+      uuid school_id FK
+      string route_name
+      string route_number
+      string vehicle_number
+      string driver_name
+      string driver_phone
+      string gps_device_id
+      boolean is_active
+    }
+    transport_stops {
+      uuid id PK
+      uuid route_id FK
+      string stop_name
+      int stop_order
+      time pickup_time
+      time drop_time
+      string landmark
+    }
+    student_transport {
+      uuid id PK
+      uuid student_id FK
+      uuid route_id FK
+      uuid stop_id FK
+      string direction
+      string academic_year
+      boolean is_active
+    }
+    hostel_rooms {
+      uuid id PK
+      uuid school_id FK
+      string room_number
+      string block
+      int capacity
+      string room_type
+      boolean is_active
+    }
+    hostel_allocations {
+      uuid id PK
+      uuid student_id FK
+      uuid room_id FK
+      date from_date
+      date to_date
+      uuid allocated_by FK
+      string academic_year
+    }
+    library_books {
+      uuid id PK
+      uuid school_id FK
+      string title
+      string author
+      string isbn
+      string category
+      int total_copies
+      int available_copies
+      string barcode
+    }
+    library_issues {
+      uuid id PK
+      uuid book_id FK
+      string borrower_type
+      uuid borrower_id FK
+      date issued_date
+      date due_date
+      date returned_date
+      numeric fine_amount
+      boolean fine_paid
+      uuid issued_by FK
+    }
+    inventory_items {
+      uuid id PK
+      uuid school_id FK
+      string name
+      string category
+      numeric quantity_in_stock
+      numeric reorder_level
+      boolean is_asset
+      string asset_tag
+    }
+    inventory_transactions {
+      uuid id PK
+      uuid item_id FK
+      string txn_type
+      numeric quantity
+      string reason
+      uuid requested_by FK
+      uuid approved_by FK
+      date txn_date
+    }
+    schools ||--o{ transport_routes : "runs"
+    transport_routes ||--o{ transport_stops : "has"
+    students ||--o{ student_transport : "uses"
+    transport_routes ||--o{ student_transport : "carries"
+    transport_stops ||--o{ student_transport : "boards at"
+    schools ||--o{ hostel_rooms : "has"
+    students ||--o{ hostel_allocations : "assigned"
+    hostel_rooms ||--o{ hostel_allocations : "hosts"
+    schools ||--o{ library_books : "catalogs"
+    library_books ||--o{ library_issues : "issued via"
+    schools ||--o{ inventory_items : "stocks"
+    inventory_items ||--o{ inventory_transactions : "tracked via"
+   `},
+
+  {id:'comms',label:'Comms',color:'#3B6D11',
+   diagram:`erDiagram
+    schools {
+      uuid id PK
+      string name
+    }
+    users {
+      uuid id PK
+      string email
+      string first_name
+    }
+    announcements {
+      uuid id PK
+      uuid school_id FK
+      string title
+      string body
+      string target_type
+      string priority
+      boolean is_published
+      timestamp publish_at
+      uuid created_by FK
+    }
+    messages {
+      uuid id PK
+      uuid school_id FK
+      uuid sender_id FK
+      uuid receiver_id FK
+      string body
+      string attachment_url
+      timestamp read_at
+      timestamp created_at
+    }
+    sms_email_log {
+      uuid id PK
+      uuid school_id FK
+      string channel
+      uuid recipient_user_id FK
+      string recipient_contact
+      string template_name
+      string body
+      string status
+      string gateway_ref
+      timestamp sent_at
+    }
+    schools ||--o{ announcements : "publishes"
+    users ||--o{ announcements : "creates"
+    users ||--o{ messages : "sends"
+    users ||--o{ messages : "receives"
+    schools ||--o{ messages : "scoped to"
+    schools ||--o{ sms_email_log : "logs"
+    users ||--o{ sms_email_log : "notified via"
+   `},
+
+  {id:'audit',label:'Audit',color:'#5F5E5A',
+   diagram:`erDiagram
+    schools {
+      uuid id PK
+      string name
+    }
+    users {
+      uuid id PK
+      string email
+      string first_name
+    }
+    audit_logs {
+      uuid id PK
+      uuid school_id FK
+      uuid user_id FK
+      string action
+      string table_name
+      uuid record_id
+      jsonb old_values
+      jsonb new_values
+      string ip_address
+      string user_agent
+      timestamp created_at
+    }
+    login_attempts {
+      uuid id PK
+      string email
+      string ip_address
+      boolean success
+      string failure_reason
+      timestamp attempted_at
+    }
+    sessions {
+      uuid id PK
+      uuid user_id FK
+      string token_hash
+      string ip_address
+      timestamp expires_at
+      timestamp revoked_at
+      timestamp created_at
+    }
+    schools ||--o{ audit_logs : "scoped to"
+    users ||--o{ audit_logs : "actor"
+    users ||--o{ sessions : "creates"
+   `},
+];
+
+const tabs=document.getElementById('tabs');
+const wrap=document.getElementById('erd-wrap');
+let current=null;
+
+async function showDomain(d,btn){
+  document.querySelectorAll('.dbt').forEach(b=>{
+    b.classList.remove('on');
+    b.style.background='transparent';
+    b.style.color='var(--color-text-secondary)';
+    b.style.borderColor='var(--color-border-secondary)';
+  });
+  btn.classList.add('on');
+  btn.style.background=d.color;
+  btn.style.color='#fff';
+  btn.style.borderColor=d.color;
+  wrap.innerHTML='<div style="padding:2rem;text-align:center;color:var(--color-text-tertiary);font-size:13px">Rendering diagram…</div>';
+  try{
+    const uid='erd-'+d.id+'-'+Date.now();
+    const {svg}=await mermaid.render(uid, d.diagram);
+    wrap.innerHTML=svg;
+    const s=wrap.querySelector('svg');
+    if(s){
+      s.style.width='100%';
+      s.style.height='auto';
+      s.style.maxWidth='100%';
+      s.removeAttribute('height');
+    }
+    postProcess(wrap);
+  }catch(e){
+    wrap.innerHTML='<div style="padding:1rem;color:var(--color-text-danger);font-size:12px">Error: '+e.message+'</div>';
+  }
+}
+
+function postProcess(container){
+  container.querySelectorAll('.node,.er.entityBox').forEach(node=>{
+    const firstPath=node.querySelector('path[d],rect');
+    if(!firstPath)return;
+    if(firstPath.tagName==='rect'){
+      firstPath.setAttribute('rx','8');
+      firstPath.setAttribute('ry','8');
+    }
+  });
+  container.querySelectorAll('path[d]').forEach(p=>{
+    const d2=p.getAttribute('d')||'';
+    const nums=d2.match(/-?[\d.]+/g)?.map(Number);
+    if(!nums||nums.length<8)return;
+    const xs=[nums[0],nums[2],nums[4],nums[6]];
+    const ys=[nums[1],nums[3],nums[5],nums[7]];
+    if(xs.some(isNaN)||ys.some(isNaN))return;
+    const x=Math.min(...xs),y=Math.min(...ys);
+    const w=Math.max(...xs)-x,h=Math.max(...ys)-y;
+    if(w<10||h<10)return;
+    const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x',x);rect.setAttribute('y',y);
+    rect.setAttribute('width',w);rect.setAttribute('height',h);
+    rect.setAttribute('rx','8');
+    for(const a of['fill','stroke','stroke-width','class','style']){
+      if(p.hasAttribute(a))rect.setAttribute(a,p.getAttribute(a));
+    }
+    p.replaceWith(rect);
+  });
+  container.querySelectorAll('.row-rect-odd path,.row-rect-even path,.row-rect-odd rect,.row-rect-even rect').forEach(p=>{
+    p.setAttribute('stroke','none');
+  });
+}
+
+DOMAINS.forEach((d,i)=>{
+  const btn=document.createElement('button');
+  btn.className='dbt';
+  btn.textContent=d.label;
+  btn.onclick=()=>showDomain(d,btn);
+  tabs.appendChild(btn);
+  if(i===0)setTimeout(()=>btn.click(),100);
+});
+</script>
